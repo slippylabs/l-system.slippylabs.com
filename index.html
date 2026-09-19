@@ -1,0 +1,663 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>L-System Turtle // l-system.slippylabs.com</title>
+<meta name="description" content="Grow plants, dragons and snowflakes from a rewriting rule — Lindenmayer systems drawn by a turtle, with stochastic rules, growth animation and SVG export. Runs entirely in your browser.">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://l-system.slippylabs.com/">
+<meta property="og:title" content="L-System Turtle // l-system.slippylabs.com">
+<meta property="og:description" content="Grow plants, dragons and snowflakes from a rewriting rule — Lindenmayer systems drawn by a turtle, with stochastic rules, growth animation and SVG export. Runs entirely in your browser.">
+<meta property="og:image" content="https://l-system.slippylabs.com/og-image.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="L-System Turtle // l-system.slippylabs.com">
+<meta name="twitter:description" content="Grow plants, dragons and snowflakes from a rewriting rule — Lindenmayer systems drawn by a turtle, with stochastic rules, growth animation and SVG export. Runs entirely in your browser.">
+<meta name="twitter:image" content="https://l-system.slippylabs.com/og-image.png">
+<link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2064%2064%22%3E%3Ccircle%20cx%3D%2232%22%20cy%3D%2234%22%20r%3D%2222%22%20fill%3D%22%231c8a52%22%20stroke%3D%22%2339ff8f%22%20stroke-width%3D%222%22%2F%3E%3Ccircle%20cx%3D%2220%22%20cy%3D%2216%22%20r%3D%228%22%20fill%3D%22%231c8a52%22%20stroke%3D%22%2339ff8f%22%20stroke-width%3D%222%22%2F%3E%3Ccircle%20cx%3D%2244%22%20cy%3D%2216%22%20r%3D%228%22%20fill%3D%22%231c8a52%22%20stroke%3D%22%2339ff8f%22%20stroke-width%3D%222%22%2F%3E%3C%2Fsvg%3E">
+<meta name="theme-color" content="#050b10">
+<link rel="stylesheet" href="style.css?v=1">
+<script>/* perf-lite: drop blend/blur effects on low-power devices. ?fx=lite or ?fx=full to override (persisted). */
+(function(){try{var k="slippy-fx",m=location.search.match(/[?&]fx=(lite|full)/),v=m?m[1]:localStorage.getItem(k);if(m)localStorage.setItem(k,v);if(v==="lite"||(v!=="full"&&(navigator.hardwareConcurrency||8)<=2))document.documentElement.classList.add("perf-lite");}catch(e){}})();</script>
+</head>
+<body>
+
+<div class="starfield"></div>
+<div class="scanlines"></div>
+
+<main class="page-wrap">
+  <div class="hud-panel wide">
+    <div class="corner tl"></div>
+    <div class="corner tr"></div>
+    <div class="corner bl"></div>
+    <div class="corner br"></div>
+
+    <div class="callsign-row">
+      <div class="toad-avatar-wrap">
+        <svg class="toad-avatar" width="46" height="46" viewBox="0 0 64 64">
+          <circle cx="32" cy="34" r="22" fill="#1c8a52" stroke="#39ff8f" stroke-width="2"/>
+          <circle cx="20" cy="16" r="8" fill="#1c8a52" stroke="#39ff8f" stroke-width="2"/>
+          <circle cx="44" cy="16" r="8" fill="#1c8a52" stroke="#39ff8f" stroke-width="2"/>
+          <circle cx="20" cy="16" r="3.5" fill="#050b10"/>
+          <circle cx="44" cy="16" r="3.5" fill="#050b10"/>
+          <ellipse cx="24" cy="32" rx="4.5" ry="5.5" fill="#050b10"/>
+          <ellipse cx="40" cy="32" rx="4.5" ry="5.5" fill="#050b10"/>
+          <circle cx="24" cy="30" r="1.4" fill="#39ff8f"/>
+          <circle cx="40" cy="30" r="1.4" fill="#39ff8f"/>
+          <path d="M22 42 Q32 48 42 42" stroke="#050b10" stroke-width="2" fill="none" stroke-linecap="round"/>
+        </svg>
+        <div class="lock-reticle"></div>
+      </div>
+      <span class="callsign">Workshop Division // Tool</span>
+      <div class="nav-links">
+        <a href="https://projects.slippylabs.com/" class="logout-link">← Archive</a>
+      </div>
+    </div>
+
+
+    <h1>L-SYSTEM TURTLE</h1>
+    <p class="subtitle">Start with one letter. Replace every letter with a string, over and over. Then read the result as instructions for a pen: draw, turn, remember, go back. That is the whole idea, and it is enough for a fern.</p>
+
+    <div class="ls-grid">
+      <div>
+        <div class="tool-field-row">
+          <label class="tool-field-label" for="preset-select">Preset</label>
+          <select class="tool-select" id="preset-select"></select>
+        </div>
+        <div class="tool-field-row">
+          <label class="tool-field-label" for="axiom-input">Axiom — the starting string</label>
+          <input class="tool-text-input" id="axiom-input" type="text" spellcheck="false"
+                 autocapitalize="off" autocomplete="off" value="F">
+        </div>
+        <div class="tool-field-row">
+          <label class="tool-field-label" for="rules-input">Rules — one per line, <code>X &rarr; …</code></label>
+          <textarea class="tool-textarea ls-rules" id="rules-input" spellcheck="false" rows="6"></textarea>
+        </div>
+        <p class="tool-note" id="rule-error" role="alert"></p>
+      </div>
+      <div>
+        <div class="tool-field-row">
+          <label class="tool-field-label" for="iter-slider">Iterations</label>
+          <div class="tool-slider-row">
+            <input type="range" id="iter-slider" min="0" max="12" value="4">
+            <span class="ls-slider-value" id="iter-value">4</span>
+          </div>
+        </div>
+        <div class="tool-field-row">
+          <label class="tool-field-label" for="angle-slider">Turn angle</label>
+          <div class="tool-slider-row">
+            <input type="range" id="angle-slider" min="1" max="180" step="0.5" value="60">
+            <span class="ls-slider-value" id="angle-value">60°</span>
+          </div>
+        </div>
+        <div class="tool-field-row">
+          <label class="tool-field-label" for="width-slider">Line width</label>
+          <div class="tool-slider-row">
+            <input type="range" id="width-slider" min="1" max="40" value="10">
+            <span class="ls-slider-value" id="width-value">1.0</span>
+          </div>
+        </div>
+        <div class="tool-field-row">
+          <label class="tool-field-label" for="colour-select">Colour</label>
+          <select class="tool-select" id="colour-select">
+            <option value="depth">By branch depth</option>
+            <option value="along">Along the path</option>
+            <option value="plain">Single colour</option>
+          </select>
+        </div>
+        <div class="tool-field-row">
+          <label class="tool-field-label" for="seed-input">Seed — for stochastic rules</label>
+          <input class="tool-number-input" id="seed-input" type="number" value="1" min="0" step="1">
+        </div>
+      </div>
+    </div>
+
+    <div class="tool-controls">
+      <button class="tool-btn" id="grow-btn">Animate Growth</button>
+      <button class="tool-btn ghost" id="reroll-btn">Reroll Seed</button>
+      <button class="tool-btn ghost" id="svg-btn">Download SVG</button>
+      <button class="tool-btn ghost" id="png-btn">Download PNG</button>
+      <a id="download-link" hidden></a>
+    </div>
+
+    <div class="ls-canvas-wrap">
+      <canvas id="turtle" width="900" height="600"></canvas>
+    </div>
+
+    <div class="net-grid" id="stat-host"></div>
+    <p class="tool-note" id="size-note"></p>
+
+    <div class="cert-section-label">The alphabet</div>
+    <div class="net-table-wrap">
+      <table class="net-table" id="alphabet-table"></table>
+    </div>
+
+    <p class="tool-note">
+      Any other letter is a silent symbol: it takes part in the rewriting but draws nothing. That is
+      how the plants work &mdash; <code>X</code> never touches the paper, it just decides where the
+      next <code>F</code> goes. A rule may be split into alternatives with a probability, as
+      <code>F &rarr; F[+F]F : 0.4</code>, and the seed makes the result repeatable: the same seed
+      always grows the same plant.
+    </p>
+    <p class="tool-note">
+      The string doubles or triples with every iteration, so it is capped at two million symbols
+      &mdash; the counter above says how close you are. Past that the browser would spend a minute
+      building a string that draws as a solid blob.
+    </p>
+    <div class="comm-window">
+      <div class="comm-portrait">
+        <svg width="36" height="36" viewBox="0 0 64 64">
+          <circle cx="32" cy="34" r="22" fill="#1c8a52" stroke="#39ff8f" stroke-width="2"/>
+          <circle cx="20" cy="16" r="8" fill="#1c8a52" stroke="#39ff8f" stroke-width="2"/>
+          <circle cx="44" cy="16" r="8" fill="#1c8a52" stroke="#39ff8f" stroke-width="2"/>
+          <circle cx="20" cy="16" r="3.5" fill="#050b10"/>
+          <circle cx="44" cy="16" r="3.5" fill="#050b10"/>
+          <ellipse cx="24" cy="32" rx="4.5" ry="5.5" fill="#050b10"/>
+          <ellipse cx="40" cy="32" rx="4.5" ry="5.5" fill="#050b10"/>
+          <circle cx="24" cy="30" r="1.4" fill="#39ff8f"/>
+          <circle cx="40" cy="30" r="1.4" fill="#39ff8f"/>
+          <path d="M22 42 Q32 48 42 42" stroke="#050b10" stroke-width="2" fill="none" stroke-linecap="round"/>
+        </svg>
+      </div>
+      <div class="comm-body">
+        <div class="comm-label"><span class="dot"></span> Incoming Transmission &mdash; Slippy</div>
+        <p>&quot;The rule for a fern is shorter than the word "fern" repeated twice.&quot;</p>
+      </div>
+    </div>
+
+    <a href="https://projects.slippylabs.com/" class="hud-btn">← Back to Archive</a>
+  </div>
+</main>
+
+
+<script>
+/* ---- Lindenmayer systems ---------------------------------------------------
+   A rewriting stage and a drawing stage, kept apart. The rewriting stage knows
+   nothing about geometry: it replaces symbols with strings, n times. The turtle
+   then reads the result as instructions. Every shape on this page is that, and
+   nothing else.
+
+   The string grows geometrically — the classic plant triples every iteration —
+   so expansion carries a hard cap and reports when it hits it, rather than
+   letting the tab die building a string nobody can draw. */
+
+const MAX_SYMBOLS = 2000000;
+
+/* A small deterministic PRNG so a stochastic system with the same seed grows
+   the same plant every time. Math.random would make the seed field a lie. */
+function mulberry32(seed) {
+  let a = seed >>> 0;
+  return function next() {
+    a |= 0;
+    a = (a + 0x6d2b79f5) | 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+/* Rules as text, one per line:
+     F -> F+F--F+F
+     X -> F[+X]F[-X]+X : 0.6
+   Several lines for the same symbol are alternatives, chosen by weight. */
+function parseRules(text) {
+  const rules = new Map();
+  const lines = String(text).split(/\r?\n/);
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i].trim();
+    if (!line || line.startsWith('#')) continue;
+    const m = /^(\S)\s*(?:->|→|=)\s*(.*)$/.exec(line);
+    if (!m) throw new Error(`Line ${i + 1}: expected something like "F -> F+F"`);
+    const symbol = m[1];
+    let body = m[2].trim();
+    let weight = 1;
+    const wm = /:\s*([0-9]*\.?[0-9]+)\s*$/.exec(body);
+    if (wm) {
+      weight = Number(wm[1]);
+      body = body.slice(0, wm.index).trim();
+      if (!(weight > 0)) throw new Error(`Line ${i + 1}: weight must be greater than zero`);
+    }
+    if (/[^A-Za-z+\-[\]|]/.test(body)) {
+      throw new Error(`Line ${i + 1}: "${body}" has a symbol that is not a letter, + - [ ] or |`);
+    }
+    if (!rules.has(symbol)) rules.set(symbol, []);
+    rules.get(symbol).push({ body, weight });
+  }
+  return rules;
+}
+
+function rulesToText(rules) {
+  const out = [];
+  for (const [symbol, alts] of rules) {
+    for (const alt of alts) {
+      out.push(`${symbol} -> ${alt.body}${alts.length > 1 ? ` : ${alt.weight}` : ''}`);
+    }
+  }
+  return out.join('\n');
+}
+
+/* One rewriting pass per iteration. Returns the string plus whether the cap
+   stopped it early, because silently truncating would draw a lie. */
+function expand(axiom, rules, iterations, seed = 1, cap = MAX_SYMBOLS) {
+  const rnd = mulberry32(seed);
+  let s = String(axiom);
+  let capped = false;
+  for (let it = 0; it < iterations; it++) {
+    let next = '';
+    for (const ch of s) {
+      const alts = rules.get(ch);
+      if (!alts || !alts.length) { next += ch; continue; }
+      if (alts.length === 1) { next += alts[0].body; continue; }
+      const total = alts.reduce((t, a) => t + a.weight, 0);
+      let r = rnd() * total;
+      let chosen = alts[alts.length - 1].body;
+      for (const alt of alts) {
+        r -= alt.weight;
+        if (r <= 0) { chosen = alt.body; break; }
+      }
+      next += chosen;
+    }
+    if (next.length > cap) { capped = true; break; }
+    s = next;
+  }
+  return { string: s, capped };
+}
+
+/* The turtle. Angles in degrees, y up (the canvas flips it at draw time).
+   F and G draw; f and g move without drawing; + turns left, - right, | turns
+   around; [ and ] save and restore position, heading and depth. Everything
+   else is a silent symbol — it steers the rewriting and draws nothing. */
+function turtle(str, angleDeg, step = 1) {
+  const rad = (angleDeg * Math.PI) / 180;
+  let x = 0;
+  let y = 0;
+  let heading = Math.PI / 2;     // start pointing up
+  let depth = 0;
+  const stack = [];
+  const segments = [];
+  let minX = 0;
+  let maxX = 0;
+  let minY = 0;
+  let maxY = 0;
+  const note = (px, py) => {
+    if (px < minX) minX = px;
+    if (px > maxX) maxX = px;
+    if (py < minY) minY = py;
+    if (py > maxY) maxY = py;
+  };
+  for (const ch of str) {
+    switch (ch) {
+      case 'F': case 'G': {
+        const nx = x + step * Math.cos(heading);
+        const ny = y + step * Math.sin(heading);
+        segments.push([x, y, nx, ny, depth]);
+        x = nx; y = ny;
+        note(x, y);
+        break;
+      }
+      case 'f': case 'g':
+        x += step * Math.cos(heading);
+        y += step * Math.sin(heading);
+        note(x, y);
+        break;
+      case '+': heading += rad; break;
+      case '-': heading -= rad; break;
+      case '|': heading += Math.PI; break;
+      case '[': stack.push([x, y, heading, depth]); depth++; break;
+      case ']': {
+        const s = stack.pop();
+        if (s) { [x, y, heading] = s; depth = s[3]; }
+        break;
+      }
+      default: break;
+    }
+  }
+  return {
+    segments,
+    bounds: { minX, minY, maxX, maxY },
+    end: { x, y, heading },
+    unbalanced: stack.length,
+  };
+}
+
+/* Fit a drawing into a box, returning the scale and offsets the canvas and the
+   SVG both use, so the two exports cannot drift apart. */
+function fitTransform(bounds, width, height, pad = 20) {
+  const w = Math.max(1e-9, bounds.maxX - bounds.minX);
+  const h = Math.max(1e-9, bounds.maxY - bounds.minY);
+  const scale = Math.min((width - pad * 2) / w, (height - pad * 2) / h);
+  return {
+    scale,
+    offsetX: pad + (width - pad * 2 - w * scale) / 2 - bounds.minX * scale,
+    offsetY: pad + (height - pad * 2 - h * scale) / 2 - bounds.minY * scale,
+  };
+}
+
+const PRESETS = [
+  {
+    name: 'Koch curve', axiom: 'F', rules: 'F -> F+F--F+F', angle: 60, iter: 4,
+    note: 'The original: replace the middle third of every line with two sides of a triangle. After n rounds it is 4^n segments long and its ends are 3^n apart.',
+  },
+  {
+    name: 'Koch snowflake', axiom: 'F--F--F', rules: 'F -> F+F--F+F', angle: 60, iter: 4,
+    note: 'Three Koch curves around a triangle. Finite area, infinite perimeter.',
+  },
+  {
+    name: 'Dragon curve', axiom: 'FX', rules: 'X -> X+YF+\nY -> -FX-Y', angle: 90, iter: 11,
+    note: 'Fold a strip of paper in half n times and open it out at right angles. It never crosses itself, and copies of it tile the plane.',
+  },
+  {
+    name: 'Sierpinski arrowhead', axiom: 'F', rules: 'F -> G-F-G\nG -> F+G+F', angle: 60, iter: 7,
+    note: 'One unbroken line that converges on the Sierpinski triangle.',
+  },
+  {
+    name: 'Sierpinski triangle', axiom: 'F-G-G', rules: 'F -> F-G+F+G-F\nG -> GG', angle: 120, iter: 5,
+    note: 'The same shape by a different route: the one where G doubles every round.',
+  },
+  {
+    name: 'Hilbert curve', axiom: 'A', rules: 'A -> +BF-AFA-FB+\nB -> -AF+BFB+FA-', angle: 90, iter: 5,
+    note: 'A curve that visits every cell of a grid and keeps neighbours near each other — which is why it is used to lay out data on disk.',
+  },
+  {
+    name: 'Gosper curve', axiom: 'F', rules: 'F -> F-G--G+F++FF+G-\nG -> +F-GG--G-F++F+G', angle: 60, iter: 4,
+    note: 'Fills a hexagon-shaped region, tile by tile. Also called the flowsnake.',
+  },
+  {
+    name: 'Lévy C curve', axiom: 'F', rules: 'F -> +F--F+', angle: 45, iter: 12,
+    note: 'Two half-size copies at right angles. Repeat and it grows a fractal boundary.',
+  },
+  {
+    name: 'Plant — bush', axiom: 'X', rules: 'X -> F+[[X]-X]-F[-FX]+X\nF -> FF', angle: 25, iter: 6,
+    note: 'The classic from Prusinkiewicz and Lindenmayer’s book. The brackets are what make it a plant rather than a line.',
+  },
+  {
+    name: 'Plant — fern', axiom: 'X', rules: 'X -> F[+X]F[-X]+X\nF -> FF', angle: 20, iter: 7,
+    note: 'Narrow the angle and the same grammar gives a fern instead of a bush.',
+  },
+  {
+    name: 'Plant — weed', axiom: 'F', rules: 'F -> F[+F]F[-F]F', angle: 25.7, iter: 5,
+    note: 'Every segment sprouts a branch either side. Symmetric, and unmistakably a plant.',
+  },
+  {
+    name: 'Plant — random', axiom: 'F',
+    rules: 'F -> F[+F]F[-F]F : 0.34\nF -> F[+F]F : 0.33\nF -> F[-F]F : 0.33',
+    angle: 24, iter: 5, seed: 7,
+    note: 'Three alternatives, chosen by weight. Change the seed and you get a different plant of the same species.',
+  },
+  {
+    name: 'Board (Peano)', axiom: 'F', rules: 'F -> F+F-F-F-F+F+F+F-F', angle: 90, iter: 3,
+    note: 'Peano’s space-filling curve, drawn as a woven square.',
+  },
+];
+
+/* ==== UI ==== */
+
+const $ = (id) => document.getElementById(id);
+const canvas = $('turtle');
+const ctx = canvas.getContext('2d', { alpha: false });
+
+let current = { segments: [], bounds: { minX: 0, minY: 0, maxX: 1, maxY: 1 } };
+let growTimer = null;
+let lastString = '';
+let lastCapped = false;
+
+function readConfig() {
+  return {
+    axiom: $('axiom-input').value.trim(),
+    rulesText: $('rules-input').value,
+    iterations: Number($('iter-slider').value),
+    angle: Number($('angle-slider').value),
+    seed: Number($('seed-input').value) || 0,
+    width: Number($('width-slider').value) / 10,
+    colour: $('colour-select').value,
+  };
+}
+
+function build(limitSegments) {
+  const cfg = readConfig();
+  const err = $('rule-error');
+  let rules;
+  try {
+    rules = parseRules(cfg.rulesText);
+    err.style.display = 'none';
+  } catch (e) {
+    err.textContent = e.message;
+    err.style.display = 'block';
+    return null;
+  }
+  const t0 = performance.now();
+  const { string, capped } = expand(cfg.axiom, rules, cfg.iterations, cfg.seed);
+  lastString = string;
+  lastCapped = capped;
+  const walk = turtle(string, cfg.angle, 1);
+  const ms = performance.now() - t0;
+  current = walk;
+  draw(limitSegments);
+  renderStats(string, walk, ms, capped, rules);
+  return walk;
+}
+
+function segmentColour(seg, i, total, cfg, maxDepth) {
+  if (cfg.colour === 'plain') return '#39ff8f';
+  if (cfg.colour === 'along') {
+    const t = total > 1 ? i / (total - 1) : 0;
+    return `hsl(${Math.round(120 + t * 180)}, 90%, ${Math.round(45 + t * 20)}%)`;
+  }
+  const d = maxDepth ? seg[4] / maxDepth : 0;
+  // trunk green through to leaf-bright at the tips
+  return `hsl(${Math.round(95 + d * 60)}, ${Math.round(60 + d * 35)}%, ${Math.round(32 + d * 38)}%)`;
+}
+
+function draw(limitSegments) {
+  const cfg = readConfig();
+  ctx.fillStyle = '#04070a';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  const segs = current.segments;
+  const n = limitSegments === undefined ? segs.length : Math.min(segs.length, limitSegments);
+  if (!n) return;
+  const tr = fitTransform(current.bounds, canvas.width, canvas.height);
+  let maxDepth = 0;
+  for (const s of segs) if (s[4] > maxDepth) maxDepth = s[4];
+  ctx.lineWidth = cfg.width;
+  ctx.lineCap = 'round';
+  // batching by colour keeps a 200k-segment drawing to a few hundred paths
+  let prevColour = null;
+  ctx.beginPath();
+  for (let i = 0; i < n; i++) {
+    const s = segs[i];
+    const colour = segmentColour(s, i, segs.length, cfg, maxDepth);
+    if (colour !== prevColour) {
+      if (prevColour !== null) { ctx.strokeStyle = prevColour; ctx.stroke(); ctx.beginPath(); }
+      prevColour = colour;
+    }
+    ctx.moveTo(s[0] * tr.scale + tr.offsetX, canvas.height - (s[1] * tr.scale + tr.offsetY));
+    ctx.lineTo(s[2] * tr.scale + tr.offsetX, canvas.height - (s[3] * tr.scale + tr.offsetY));
+  }
+  ctx.strokeStyle = prevColour || '#39ff8f';
+  ctx.stroke();
+}
+
+function renderStats(string, walk, ms, capped, rules) {
+  const b = walk.bounds;
+  const tiles = [
+    ['Symbols', string.length.toLocaleString('en-US')],
+    ['Segments', walk.segments.length.toLocaleString('en-US')],
+    ['Distinct rules', String(rules.size)],
+    ['Width × height', `${(b.maxX - b.minX).toFixed(1)} × ${(b.maxY - b.minY).toFixed(1)}`],
+    ['End point', `${walk.end.x.toFixed(2)}, ${walk.end.y.toFixed(2)}`],
+    ['Build time', `${ms.toFixed(0)} ms`],
+  ];
+  $('stat-host').innerHTML = tiles.map(([label, value]) => `
+    <div class="net-tile">
+      <div class="net-tile-label">${label}</div>
+      <div class="net-tile-value mono">${value}</div>
+    </div>`).join('');
+
+  const note = $('size-note');
+  const parts = [];
+  if (capped) {
+    parts.push(`<span class="ls-warn">Stopped early:</span> the next iteration would pass the
+      two-million symbol cap, so this is the last one that fits.`);
+  } else {
+    parts.push(`${((string.length / MAX_SYMBOLS) * 100).toFixed(1)}% of the symbol cap.`);
+  }
+  if (walk.unbalanced) {
+    parts.push(`<span class="ls-warn">${walk.unbalanced} unclosed bracket${walk.unbalanced > 1 ? 's' : ''}</span>
+      — every <code>[</code> needs a <code>]</code>, or the turtle never comes back.`);
+  }
+  note.innerHTML = parts.join(' ');
+
+  const used = new Map();
+  for (const ch of string) used.set(ch, (used.get(ch) || 0) + 1);
+  const MEANING = {
+    F: 'draw forward', G: 'draw forward', f: 'move without drawing', g: 'move without drawing',
+    '+': 'turn left', '-': 'turn right', '|': 'turn around',
+    '[': 'remember where you are', ']': 'go back there',
+  };
+  const rows = [...used.entries()].sort((a, b) => b[1] - a[1]).slice(0, 10).map(([ch, count]) => `
+    <tr><td>${ch === ' ' ? '␣' : ch.replace('<', '&lt;')}</td>
+      <td>${MEANING[ch] || 'silent — steers the rewriting only'}</td>
+      <td>${count.toLocaleString('en-US')}</td></tr>`).join('');
+  $('alphabet-table').innerHTML = `<thead><tr><th>Symbol</th><th>What the turtle does</th><th>Count</th></tr></thead><tbody>${rows}</tbody>`;
+}
+
+/* ---- controls ---- */
+
+$('preset-select').innerHTML = PRESETS.map((p, i) => `<option value="${i}">${p.name}</option>`).join('');
+
+function loadPreset(i) {
+  const p = PRESETS[i];
+  $('axiom-input').value = p.axiom;
+  $('rules-input').value = p.rules;
+  $('angle-slider').value = String(p.angle);
+  $('angle-value').textContent = `${p.angle}°`;
+  $('iter-slider').value = String(p.iter);
+  $('iter-value').textContent = String(p.iter);
+  if (p.seed !== undefined) $('seed-input').value = String(p.seed);
+  build();
+}
+$('preset-select').addEventListener('change', (e) => loadPreset(Number(e.target.value)));
+
+['axiom-input', 'rules-input', 'seed-input'].forEach((id) =>
+  $(id).addEventListener('input', () => build()));
+$('iter-slider').addEventListener('input', (e) => {
+  $('iter-value').textContent = e.target.value;
+  build();
+});
+$('angle-slider').addEventListener('input', (e) => {
+  $('angle-value').textContent = `${e.target.value}°`;
+  build();
+});
+$('width-slider').addEventListener('input', (e) => {
+  $('width-value').textContent = (Number(e.target.value) / 10).toFixed(1);
+  draw();
+});
+$('colour-select').addEventListener('change', () => draw());
+$('reroll-btn').addEventListener('click', () => {
+  $('seed-input').value = String(Math.floor(Math.random() * 100000));
+  build();
+});
+$('grow-btn').addEventListener('click', () => {
+  if (growTimer) { cancelAnimationFrame(growTimer); growTimer = null; }
+  const total = current.segments.length;
+  if (!total) return;
+  let shown = 0;
+  const per = Math.max(1, Math.round(total / 90));
+  const tick = () => {
+    shown += per;
+    draw(shown);
+    if (shown < total) growTimer = requestAnimationFrame(tick);
+    else growTimer = null;
+  };
+  tick();
+});
+
+/* ---- export ---- */
+
+function toSVG() {
+  const w = canvas.width;
+  const h = canvas.height;
+  const cfg = readConfig();
+  const tr = fitTransform(current.bounds, w, h);
+  let maxDepth = 0;
+  for (const s of current.segments) if (s[4] > maxDepth) maxDepth = s[4];
+  const parts = [`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${w} ${h}" width="${w}" height="${h}">`];
+  parts.push(`<rect width="${w}" height="${h}" fill="#04070a"/>`);
+  parts.push(`<g stroke-width="${cfg.width}" stroke-linecap="round" fill="none">`);
+  current.segments.forEach((s, i) => {
+    const x1 = (s[0] * tr.scale + tr.offsetX).toFixed(2);
+    const y1 = (h - (s[1] * tr.scale + tr.offsetY)).toFixed(2);
+    const x2 = (s[2] * tr.scale + tr.offsetX).toFixed(2);
+    const y2 = (h - (s[3] * tr.scale + tr.offsetY)).toFixed(2);
+    parts.push(`<path d="M${x1},${y1} L${x2},${y2}" stroke="${segmentColour(s, i, current.segments.length, cfg, maxDepth)}"/>`);
+  });
+  parts.push('</g></svg>');
+  return parts.join('\n');
+}
+
+function download(blob, name) {
+  const url = URL.createObjectURL(blob);
+  const a = $('download-link');
+  a.href = url;
+  a.download = name;
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(url), 4000);
+}
+$('svg-btn').addEventListener('click', () => {
+  if (current.segments.length > 60000) {
+    $('size-note').innerHTML = `<span class="ls-warn">That is ${current.segments.length.toLocaleString('en-US')}
+      separate paths</span> — the SVG would be tens of megabytes. Lower the iterations first,
+      or export the PNG instead.`;
+    return;
+  }
+  download(new Blob([toSVG()], { type: 'image/svg+xml' }), 'l-system.svg');
+});
+$('png-btn').addEventListener('click', () => {
+  canvas.toBlob((blob) => download(blob, 'l-system.png'), 'image/png');
+});
+
+/* ---- headless hook ---- */
+
+window.__lsystem = {
+  parseRules, expand, turtle, fitTransform, PRESETS, mulberry32,
+  build: (opts = {}) => {
+    if (opts.axiom !== undefined) $('axiom-input').value = opts.axiom;
+    if (opts.rules !== undefined) $('rules-input').value = opts.rules;
+    if (opts.angle !== undefined) { $('angle-slider').value = String(opts.angle); $('angle-value').textContent = `${opts.angle}°`; }
+    if (opts.iterations !== undefined) { $('iter-slider').value = String(opts.iterations); $('iter-value').textContent = String(opts.iterations); }
+    if (opts.seed !== undefined) $('seed-input').value = String(opts.seed);
+    return build();
+  },
+  loadPreset,
+  get string() { return lastString; },
+  get capped() { return lastCapped; },
+  get segments() { return current.segments.length; },
+  svg: toSVG,
+};
+
+/* ---- boot ---- */
+
+loadPreset(0);
+</script>
+<!-- Slippy Deck: floating Slippy TV + jukebox player. Renders nothing unless admin.slippylabs.com/whoami confirms a signed-in account. -->
+<script defer src="https://slippylabs.com/deck/deck.js"></script>
+<!-- Slippy Labs sitewide privacy link. Self-contained on purpose: these sites
+     share no CSS, so it carries its own styles and inherits the page's text
+     colour instead of assuming a palette. position/z-index are load bearing --
+     the HUD theme's .starfield/.scanlines are fixed at z-index 0-1 and would
+     paint straight over an unpositioned footer.
+     The .page-wrap trim below is what keeps the bar on the first screen. -->
+<div class="sl-legal"><a href="https://slippylabs.com/privacy.html">Privacy</a></div>
+<style>
+.sl-legal{box-sizing:border-box;position:relative;z-index:3;height:64px;display:flex;align-items:center;justify-content:center;margin:0;padding:0 12px;font-family:"Consolas","SFMono-Regular",Menlo,Monaco,"Courier New",monospace;font-size:11px;letter-spacing:.08em;text-transform:uppercase;opacity:.5}
+.sl-legal a{color:inherit;text-decoration:none;display:inline-flex;align-items:center;justify-content:center;min-height:44px;padding:0 14px}
+.sl-legal a:hover,.sl-legal a:focus-visible{text-decoration:underline;opacity:1}
+/* This page centres .page-wrap at min-height:100vh, which would push the bar a
+   whole screen below the fold. Give back exactly the bar height instead of
+   adding a scrollbar to a page that had none. */
+.page-wrap{min-height:calc(100vh - 64px)}
+</style>
+</body>
+</html>
